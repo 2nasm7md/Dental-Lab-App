@@ -65,6 +65,57 @@ supabase/migrations/
    npm run dev
    ```
 
+## Deploy to Vercel
+
+The repo is Vercel-ready. The remote execution environment this code was
+written in cannot reach `vercel.com`, so deploy is a manual click-through —
+takes about two minutes.
+
+### 1. Import the repo
+
+Go to <https://vercel.com/new>, pick **Import Git Repository**, and select
+`2nasm7md/Dental-Lab-App`. Vercel auto-detects Next.js — leave the build
+settings alone.
+
+If you want the first deploy to come off this branch instead of `main`,
+on the import screen switch the **Production Branch** to
+`claude/youthful-meitner-s7pfgt` (or merge to `main` first).
+
+### 2. Set environment variables
+
+In the import wizard's **Environment Variables** section, add these
+(values come from your Supabase project's Settings → API):
+
+| Key | Value |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://xisnldlfuiyryzzzchgl.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the `anon`/`publishable` key |
+| `SUPABASE_SERVICE_ROLE_KEY` | the `service_role` key (mark **Sensitive**) |
+| `NEXT_PUBLIC_APP_URL` | `https://<your-vercel-domain>.vercel.app` |
+| `DEFAULT_LOCALE` | `ar` |
+
+> The service role key bypasses RLS — set it as Sensitive and never expose
+> it client-side. The app only reads it from `createSupabaseServiceClient`
+> in `src/lib/supabase/server.ts`, which is server-only code.
+
+### 3. Add the Vercel domain to Supabase Auth
+
+In Supabase → Authentication → URL Configuration, add the deployed URL
+(and any preview-URL pattern you want) to **Site URL** and **Redirect URLs**.
+Without this, magic-link / password-reset emails will redirect to localhost.
+
+### 4. Click Deploy
+
+The first build takes ~2 min. Once live, sign up → onboarding will land
+you on the dashboard. If you haven't run the four SQL migrations yet,
+signup will fail with an RLS / missing-table error — apply them first.
+
+### Preview deployments
+
+Every push to a non-production branch gets its own preview URL. Pull
+requests from `claude/*` branches will deploy automatically, so future
+feature work is reviewable before merging.
+
 ## Phase plan
 
 - **Phase 1 ✅** — Auth, orgs, connections, case CRUD, state machine, dashboards, chat, RLS.
