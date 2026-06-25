@@ -14,7 +14,10 @@ export default async function OnboardingPage() {
   async function action(formData: FormData) {
     'use server';
     const r = await createOrgAction(formData);
-    if (!r.ok) return r;
+    if (r && !r.ok) {
+      const { redirect } = await import('next/navigation');
+      redirect(`/onboarding?error=${encodeURIComponent(r.error ?? 'error')}`);
+    }
   }
 
   return (

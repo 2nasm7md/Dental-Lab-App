@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import { redirect } from 'next/navigation';
 import { signInAction } from '@/server/actions/auth';
 import { FormBanner } from '@/components/forms/form-banner';
 
@@ -9,7 +10,9 @@ export default async function LoginPage() {
   async function action(formData: FormData) {
     'use server';
     const result = await signInAction(formData);
-    if (!result.ok) return result;
+    if (result && !result.ok) {
+      redirect(`/login?error=${encodeURIComponent(result.error ?? 'error')}`);
+    }
   }
 
   return (

@@ -84,21 +84,24 @@ export async function getClinicPartnerTotals(): Promise<PartnerTotal[]> {
       `price, payment_status, status, lab_org_id, lab:lab_org_id ( id, name )`
     )
     .is('deleted_at', null);
-  const rows = (data ?? []) as Array<{
+  const rows = (data ?? []) as unknown as Array<{
     price: number | null;
     payment_status: PaymentStatus | null;
     status: CaseStatus;
     lab_org_id: string | null;
-    lab: { id: string; name: string } | null;
+    lab: { id: string; name: string } | { id: string; name: string }[] | null;
   }>;
   return aggregate(
-    rows.map((r) => ({
-      price: r.price,
-      payment_status: r.payment_status,
-      status: r.status,
-      partner_id: r.lab?.id ?? r.lab_org_id,
-      partner_name: r.lab?.name ?? null,
-    }))
+    rows.map((r) => {
+      const lab = Array.isArray(r.lab) ? r.lab[0] : r.lab;
+      return {
+        price: r.price,
+        payment_status: r.payment_status,
+        status: r.status,
+        partner_id: lab?.id ?? r.lab_org_id,
+        partner_name: lab?.name ?? null,
+      };
+    })
   );
 }
 
@@ -110,20 +113,23 @@ export async function getLabPartnerTotals(): Promise<PartnerTotal[]> {
       `price, payment_status, status, clinic_org_id, clinic:clinic_org_id ( id, name )`
     )
     .is('deleted_at', null);
-  const rows = (data ?? []) as Array<{
+  const rows = (data ?? []) as unknown as Array<{
     price: number | null;
     payment_status: PaymentStatus | null;
     status: CaseStatus;
     clinic_org_id: string;
-    clinic: { id: string; name: string } | null;
+    clinic: { id: string; name: string } | { id: string; name: string }[] | null;
   }>;
   return aggregate(
-    rows.map((r) => ({
-      price: r.price,
-      payment_status: r.payment_status,
-      status: r.status,
-      partner_id: r.clinic?.id ?? r.clinic_org_id,
-      partner_name: r.clinic?.name ?? null,
-    }))
+    rows.map((r) => {
+      const clinic = Array.isArray(r.clinic) ? r.clinic[0] : r.clinic;
+      return {
+        price: r.price,
+        payment_status: r.payment_status,
+        status: r.status,
+        partner_id: clinic?.id ?? r.clinic_org_id,
+        partner_name: clinic?.name ?? null,
+      };
+    })
   );
 }

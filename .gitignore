@@ -13,3 +13,4 @@ coverage
 next-env.d.ts
 .vercel
 .turbo
+tsconfig.tsbuildinfo
