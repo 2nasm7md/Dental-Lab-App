@@ -12,6 +12,31 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ConnectionsActions } from '@/components/connections/connections-actions';
 import { ConnectionsDirectory } from '@/components/connections/connections-directory';
 
+async function step<T>(label: string, run: () => Promise<T>): Promise<T> {
+  try {
+    const v = await run();
+    console.log(
+      `[connections:${label}] ok`,
+      Array.isArray(v) ? `rows=${v.length}` : typeof v
+    );
+    return v;
+  } catch (e) {
+    const err = e as Error & { code?: string; details?: string; hint?: string };
+    console.error(`[connections:${label}] failed`, {
+      name: err?.name,
+      message: err?.message,
+      code: err?.code,
+      details: err?.details,
+      hint: err?.hint,
+      stack: err?.stack,
+    });
+    // Re-throw with a labelled message so the error boundary names the step.
+    const wrapped = new Error(`[connections:${label}] ${err?.message ?? String(e)}`);
+    (wrapped as Error & { cause?: unknown }).cause = e;
+    throw wrapped;
+  }
+}
+
 export default async function ConnectionsPage({
   searchParams,
 }: {
@@ -22,15 +47,23 @@ export default async function ConnectionsPage({
   const side = sideOfOrgType(session.organization.type);
   const q = (searchParams.q ?? '').trim();
 
-  const [partners, pending, outgoing, directory] = await Promise.all([
-    listActivePartners(session.organization.id, side),
-    // Only labs need to "respond" to pending; clinics initiate.
-    side === 'lab'
-      ? listPendingConnections(session.organization.id, side)
-      : Promise.resolve([] as Awaited<ReturnType<typeof listPendingConnections>>),
-    listOutgoingPending(session.organization.id, side),
-    fetchDirectory(side === 'clinic' ? 'lab' : 'clinic', q, session.organization.id),
-  ]);
+  // Each step is awaited individually with a labelled try/catch so a failure
+  // shows up in the error boundary as `[connections:<step>] <message>` instead
+  // of a bare TypeError with no clue which call blew up.
+  const partners = await step('listActivePartners', () =>
+    listActivePartners(session.organization.id, side)
+  );
+  const pending = side === 'lab'
+    ? await step('listPendingConnections', () =>
+        listPendingConnections(session.organization.id, side)
+      )
+    : [];
+  const outgoing = await step('listOutgoingPending', () =>
+    listOutgoingPending(session.organization.id, side)
+  );
+  const directory = await step('fetchDirectory', () =>
+    fetchDirectory(side === 'clinic' ? 'lab' : 'clinic', q, session.organization.id)
+  );
 
   const linkedIds = new Set(partners.map((p) => p.org.id));
   const pendingIds = new Set([
@@ -143,7 +176,16 @@ async function fetchDirectory(
     const safe = q.replace(/[%(),]/g, '');
     query = query.or(`name.ilike.%${safe}%,phone.ilike.%${safe}%`);
   }
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) {
+    console.error('[connections:fetchDirectory] supabase error', {
+      message: error.message,
+      code: (error as { code?: string }).code,
+      details: (error as { details?: string }).details,
+      hint: (error as { hint?: string }).hint,
+    });
+    throw new Error(`fetchDirectory: ${error.message}`);
+  }
   return (data ?? []) as Array<{
     id: string;
     name: string;
