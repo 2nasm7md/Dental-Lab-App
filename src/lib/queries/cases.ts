@@ -27,19 +27,62 @@ const ACTIVE_STATUSES: CaseStatus[] = [
 const CLOSED_STATUSES: CaseStatus[] = ['delivered', 'cancelled'];
 const ATTENTION_STATUSES: CaseStatus[] = ['declined', 'redo'];
 
+// cases has two FKs to organizations (clinic_org_id, lab_org_id) and two to
+// users (owner_doctor_id, assigned_technician_id, created_by). PostgREST embed
+// disambiguation across two FKs is fragile across versions, so we hydrate
+// related rows with separate queries and merge.
+async function hydrateRelations(rows: DentalCase[]): Promise<CaseRow[]> {
+  if (rows.length === 0) return [];
+  const supabase = createSupabaseServerClient();
+
+  const orgIds = new Set<string>();
+  const userIds = new Set<string>();
+  for (const r of rows) {
+    if (r.clinic_org_id) orgIds.add(r.clinic_org_id);
+    if (r.lab_org_id) orgIds.add(r.lab_org_id);
+    if (r.owner_doctor_id) userIds.add(r.owner_doctor_id);
+    if (r.assigned_technician_id) userIds.add(r.assigned_technician_id);
+  }
+
+  const [{ data: orgData }, { data: userData }] = await Promise.all([
+    orgIds.size > 0
+      ? supabase
+          .from('organizations')
+          .select('id, name')
+          .in('id', Array.from(orgIds))
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+    userIds.size > 0
+      ? supabase
+          .from('users')
+          .select('id, full_name')
+          .in('id', Array.from(userIds))
+      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string }> }),
+  ]);
+
+  const orgs = new Map((orgData ?? []).map((o) => [o.id, o]));
+  const users = new Map((userData ?? []).map((u) => [u.id, u]));
+
+  return rows.map((r) => ({
+    ...r,
+    lab: r.lab_org_id ? orgs.get(r.lab_org_id) ?? null : null,
+    clinic: r.clinic_org_id ? orgs.get(r.clinic_org_id) ?? null : null,
+    owner_doctor: r.owner_doctor_id ? users.get(r.owner_doctor_id) ?? null : null,
+    technician: r.assigned_technician_id
+      ? users.get(r.assigned_technician_id) ?? null
+      : null,
+  }));
+}
+
+function escapeOrFilter(input: string): string {
+  // PostgREST .or() treats parens, commas, and the percent literal as syntax.
+  return input.replace(/[%(),:]/g, '');
+}
+
 export async function listCases(filters: CaseFilters = {}): Promise<CaseRow[]> {
   const supabase = createSupabaseServerClient();
   let q = supabase
     .from('cases')
-    .select(
-      `
-      *,
-      lab:lab_org_id ( id, name ),
-      clinic:clinic_org_id ( id, name ),
-      owner_doctor:owner_doctor_id ( id, full_name ),
-      technician:assigned_technician_id ( id, full_name )
-    `
-    )
+    .select('*')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(100);
@@ -55,34 +98,37 @@ export async function listCases(filters: CaseFilters = {}): Promise<CaseRow[]> {
   if (filters.doctorId) q = q.eq('owner_doctor_id', filters.doctorId);
   if (filters.technicianId) q = q.eq('assigned_technician_id', filters.technicianId);
   if (filters.q) {
-    q = q.or(
-      `case_number.ilike.%${filters.q}%,patient_name.ilike.%${filters.q}%,patient_ref.ilike.%${filters.q}%`
-    );
+    const safe = escapeOrFilter(filters.q);
+    if (safe) {
+      q = q.or(
+        `case_number.ilike.%${safe}%,patient_name.ilike.%${safe}%,patient_ref.ilike.%${safe}%`
+      );
+    }
   }
 
   const { data, error } = await q;
-  if (error) throw error;
-  return (data ?? []) as unknown as CaseRow[];
+  if (error) {
+    console.error('listCases failed:', error);
+    return [];
+  }
+  return hydrateRelations((data ?? []) as DentalCase[]);
 }
 
 export async function getCaseById(id: string): Promise<CaseRow | null> {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from('cases')
-    .select(
-      `
-      *,
-      lab:lab_org_id ( id, name ),
-      clinic:clinic_org_id ( id, name ),
-      owner_doctor:owner_doctor_id ( id, full_name ),
-      technician:assigned_technician_id ( id, full_name )
-    `
-    )
+    .select('*')
     .eq('id', id)
     .is('deleted_at', null)
     .maybeSingle();
-  if (error) throw error;
-  return (data as unknown as CaseRow) ?? null;
+  if (error) {
+    console.error('getCaseById failed:', error);
+    return null;
+  }
+  if (!data) return null;
+  const [hydrated] = await hydrateRelations([data as DentalCase]);
+  return hydrated ?? null;
 }
 
 export interface DashboardCounts {
@@ -97,9 +143,12 @@ export async function getDashboardCounts(): Promise<DashboardCounts> {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from('cases')
-    .select('status', { count: 'exact', head: false })
+    .select('status')
     .is('deleted_at', null);
-  if (error) throw error;
+  if (error) {
+    console.error('getDashboardCounts failed:', error);
+    return { total: 0, pending: 0, inProduction: 0, ready: 0, attention: 0 };
+  }
   const rows = (data ?? []) as { status: CaseStatus }[];
   return {
     total: rows.length,

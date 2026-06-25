@@ -76,32 +76,38 @@ function aggregate(rows: CaseLite[]): PartnerTotal[] {
   return [...byPartner.values()].sort((a, b) => b.balance - a.balance);
 }
 
+async function partnerNameMap(ids: string[]): Promise<Map<string, string>> {
+  const supabase = createSupabaseServerClient();
+  const unique = Array.from(new Set(ids.filter(Boolean)));
+  if (unique.length === 0) return new Map();
+  const { data } = await supabase
+    .from('organizations')
+    .select('id, name')
+    .in('id', unique);
+  return new Map(((data ?? []) as Array<{ id: string; name: string }>).map((o) => [o.id, o.name]));
+}
+
 export async function getClinicPartnerTotals(): Promise<PartnerTotal[]> {
   const supabase = createSupabaseServerClient();
   const { data } = await supabase
     .from('cases')
-    .select(
-      `price, payment_status, status, lab_org_id, lab:lab_org_id ( id, name )`
-    )
+    .select('price, payment_status, status, lab_org_id')
     .is('deleted_at', null);
-  const rows = (data ?? []) as unknown as Array<{
+  const rows = (data ?? []) as Array<{
     price: number | null;
     payment_status: PaymentStatus | null;
     status: CaseStatus;
     lab_org_id: string | null;
-    lab: { id: string; name: string } | { id: string; name: string }[] | null;
   }>;
+  const names = await partnerNameMap(rows.map((r) => r.lab_org_id ?? ''));
   return aggregate(
-    rows.map((r) => {
-      const lab = Array.isArray(r.lab) ? r.lab[0] : r.lab;
-      return {
-        price: r.price,
-        payment_status: r.payment_status,
-        status: r.status,
-        partner_id: lab?.id ?? r.lab_org_id,
-        partner_name: lab?.name ?? null,
-      };
-    })
+    rows.map((r) => ({
+      price: r.price,
+      payment_status: r.payment_status,
+      status: r.status,
+      partner_id: r.lab_org_id,
+      partner_name: r.lab_org_id ? names.get(r.lab_org_id) ?? null : null,
+    }))
   );
 }
 
@@ -109,27 +115,22 @@ export async function getLabPartnerTotals(): Promise<PartnerTotal[]> {
   const supabase = createSupabaseServerClient();
   const { data } = await supabase
     .from('cases')
-    .select(
-      `price, payment_status, status, clinic_org_id, clinic:clinic_org_id ( id, name )`
-    )
+    .select('price, payment_status, status, clinic_org_id')
     .is('deleted_at', null);
-  const rows = (data ?? []) as unknown as Array<{
+  const rows = (data ?? []) as Array<{
     price: number | null;
     payment_status: PaymentStatus | null;
     status: CaseStatus;
     clinic_org_id: string;
-    clinic: { id: string; name: string } | { id: string; name: string }[] | null;
   }>;
+  const names = await partnerNameMap(rows.map((r) => r.clinic_org_id));
   return aggregate(
-    rows.map((r) => {
-      const clinic = Array.isArray(r.clinic) ? r.clinic[0] : r.clinic;
-      return {
-        price: r.price,
-        payment_status: r.payment_status,
-        status: r.status,
-        partner_id: clinic?.id ?? r.clinic_org_id,
-        partner_name: clinic?.name ?? null,
-      };
-    })
+    rows.map((r) => ({
+      price: r.price,
+      payment_status: r.payment_status,
+      status: r.status,
+      partner_id: r.clinic_org_id,
+      partner_name: names.get(r.clinic_org_id) ?? null,
+    }))
   );
 }
