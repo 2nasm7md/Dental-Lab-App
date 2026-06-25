@@ -2,7 +2,7 @@
 
 A two-sided SaaS platform that connects dental clinics with dental labs and organizes the prosthetic cases a clinic sends to a lab.
 
-This repository implements **Phase 1 — Foundation & MVP loop** of the build plan: data model, RLS, auth, onboarding, connections, case creation, dashboards, the case lifecycle state machine, per-case chat, and the timeline. The UI is Arabic-first with full RTL.
+This repository implements **Phases 1–3 (web)** of the build plan: data model, RLS, auth, onboarding, connections, case creation, dashboards, the case lifecycle state machine, per-case realtime chat, the timeline, **realtime in-app notifications**, and the **shared cost-tracking ledger** with per-partner totals. The UI is Arabic-first with full RTL. The Expo doctor mobile app (Phase 3) is deferred.
 
 ## Stack
 
@@ -36,6 +36,8 @@ supabase/migrations/
   002_rls_policies.sql        Row-level security for every table
   003_state_machine.sql       Transition RPCs: send/accept/decline/advance/...
   004_storage_buckets.sql     case-attachments / avatars / org-logos
+  005_notifications.sql       new_message/connection_request/payment_updated
+                              triggers + realtime publication + mark-all-read
 ```
 
 ## Setup
@@ -65,9 +67,13 @@ supabase/migrations/
 
 ## Phase plan
 
-- **Phase 1 (this commit)** — Auth, orgs, connections, case CRUD, state machine, dashboards, chat, RLS.
-- **Phase 2** — Real-time notification fan-out, photo attachments UI, timeline polish.
-- **Phase 3** — Cost tracking summaries per partner, Expo mobile app for doctors.
+- **Phase 1 ✅** — Auth, orgs, connections, case CRUD, state machine, dashboards, chat, RLS.
+- **Phase 2 ✅** — Realtime in-app notification fan-out (bell + page) for every trigger
+  (`case_assigned`, `case_accepted`, `case_declined`, `status_changed`, `new_message`,
+  `connection_request`, `connection_accepted`, `payment_updated`).
+- **Phase 3 ✅ (web)** — Shared cost ledger: per-case price + payment status editor,
+  `/billing` page with per-partner totals and overall billed/paid/balance. Expo
+  mobile app is deferred.
 - **Phase 4** — Board views, overdue/timeout flagging, advanced filters.
 
 ## Permission model — quick reference

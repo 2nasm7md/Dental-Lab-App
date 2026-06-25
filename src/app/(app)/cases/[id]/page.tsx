@@ -14,7 +14,8 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { CaseTimeline } from '@/components/cases/case-timeline';
 import { CaseActions } from '@/components/cases/case-actions';
 import { CaseChat } from '@/components/cases/case-chat';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { CasePaymentEditor } from '@/components/cases/case-payment-editor';
+import { formatDate } from '@/lib/utils';
 
 export default async function CaseDetailPage({ params }: { params: { id: string } }) {
   const session = (await getCurrentSession())!;
@@ -107,12 +108,6 @@ export default async function CaseDetailPage({ params }: { params: { id: string 
               {c.technician ? (
                 <Item k={t('case.technician')} v={c.technician.full_name} icon={<User className="size-4" />} />
               ) : null}
-              {costTrackingEnabled && c.price != null ? (
-                <Item
-                  k={t('payment.price')}
-                  v={formatCurrency(c.price, c.currency ?? 'USD')}
-                />
-              ) : null}
             </dl>
             {c.doctor_notes ? (
               <div className="mt-4">
@@ -140,6 +135,25 @@ export default async function CaseDetailPage({ params }: { params: { id: string 
         </div>
 
         <aside className="space-y-5">
+          {costTrackingEnabled ? (
+            <section className="card p-5">
+              <h2 className="font-semibold text-ink mb-3">{t('payment.label')}</h2>
+              <CasePaymentEditor
+                caseId={c.id}
+                initialPrice={c.price}
+                initialStatus={c.payment_status}
+                currency={c.currency ?? session.organization!.currency}
+                canEdit={
+                  side === 'clinic'
+                    ? ['clinic_admin', 'doctor', 'secretary'].includes(
+                        session.profile!.role!
+                      )
+                    : session.profile!.role === 'lab_admin'
+                }
+              />
+            </section>
+          ) : null}
+
           <section className="card p-5">
             <div className="flex items-center gap-2 mb-3">
               <FileText className="size-5 text-brand-600" />

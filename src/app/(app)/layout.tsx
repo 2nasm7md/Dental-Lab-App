@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getCurrentSession } from '@/lib/current-user';
 import { AppShell } from '@/components/layout/app-shell';
+import { NotificationBell } from '@/components/notifications/notification-bell';
+import { listMyNotifications, getUnreadCount } from '@/lib/queries/notifications';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getCurrentSession();
@@ -8,5 +10,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session.profile?.organization_id || !session.profile?.role) {
     redirect('/onboarding');
   }
-  return <AppShell session={session}>{children}</AppShell>;
+
+  const [items, unread] = await Promise.all([
+    listMyNotifications(),
+    getUnreadCount(),
+  ]);
+
+  return (
+    <AppShell
+      session={session}
+      notificationsSlot={
+        <NotificationBell
+          initial={items}
+          initialUnread={unread}
+          recipientUserId={session.profile.id}
+        />
+      }
+    >
+      {children}
+    </AppShell>
+  );
 }

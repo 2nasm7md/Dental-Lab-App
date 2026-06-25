@@ -77,7 +77,11 @@
     "previous": "السابق",
     "open": "فتح",
     "viewAll": "عرض الكل",
-    "assign": "تعيين فني"
+    "assign": "تعيين فني",
+    "markAllRead": "تعليم الكل كمقروء",
+    "markPaid": "تم الدفع",
+    "markPartiallyPaid": "مدفوع جزئياً",
+    "markUnpaid": "غير مدفوع"
   },
   "restoration": {
     "crown": "تاج",

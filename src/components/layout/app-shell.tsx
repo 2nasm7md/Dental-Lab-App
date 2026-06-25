@@ -12,6 +12,7 @@ import {
   Bell,
   LogOut,
   Globe,
+  Wallet,
 } from 'lucide-react';
 import type { CurrentSession } from '@/lib/current-user';
 import { cn, initials } from '@/lib/utils';
@@ -25,7 +26,7 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-function buildNav(side: 'clinic' | 'lab'): NavItem[] {
+function buildNav(side: 'clinic' | 'lab', costTracking: boolean): NavItem[] {
   return [
     { href: '/dashboard', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="size-5" /> },
     { href: '/cases', labelKey: 'nav.cases', icon: <ClipboardList className="size-5" /> },
@@ -37,6 +38,9 @@ function buildNav(side: 'clinic' | 'lab'): NavItem[] {
       labelKey: side === 'clinic' ? 'nav.labs' : 'nav.clinics',
       icon: <Building2 className="size-5" />,
     },
+    ...(costTracking
+      ? [{ href: '/billing', labelKey: 'nav.billing', icon: <Wallet className="size-5" /> }]
+      : []),
     { href: '/notifications', labelKey: 'nav.notifications', icon: <Bell className="size-5" /> },
     { href: '/settings', labelKey: 'nav.settings', icon: <Settings className="size-5" /> },
   ];
@@ -45,9 +49,11 @@ function buildNav(side: 'clinic' | 'lab'): NavItem[] {
 export function AppShell({
   session,
   children,
+  notificationsSlot,
 }: {
   session: CurrentSession;
   children: React.ReactNode;
+  notificationsSlot?: React.ReactNode;
 }) {
   const t = useTranslations();
   const pathname = usePathname();
@@ -55,7 +61,10 @@ export function AppShell({
   const side = session.organization
     ? sideOfOrgType(session.organization.type)
     : 'clinic';
-  const items = buildNav(side);
+  const costTracking =
+    (session.organization?.settings as { cost_tracking_enabled?: boolean })
+      ?.cost_tracking_enabled !== false;
+  const items = buildNav(side, costTracking);
 
   return (
     <div className="min-h-screen flex bg-surface-muted">
@@ -108,8 +117,8 @@ export function AppShell({
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="md:hidden bg-white border-b border-surface-border px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <header className="bg-white border-b border-surface-border px-4 md:px-8 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 md:hidden">
             <div className="size-8 rounded-xl bg-brand-600 text-white grid place-items-center font-bold">
               D
             </div>
@@ -117,8 +126,14 @@ export function AppShell({
               {session.organization?.name}
             </div>
           </div>
-          <div className="size-9 rounded-full bg-brand-100 text-brand-800 grid place-items-center text-sm font-semibold">
-            {initials(session.profile?.full_name ?? '')}
+          <div className="hidden md:block font-semibold text-ink-muted">
+            {session.profile?.full_name}
+          </div>
+          <div className="flex items-center gap-3">
+            {notificationsSlot}
+            <div className="size-9 rounded-full bg-brand-100 text-brand-800 grid place-items-center text-sm font-semibold">
+              {initials(session.profile?.full_name ?? '')}
+            </div>
           </div>
         </header>
         <main className="flex-1 p-4 md:p-8 min-w-0">{children}</main>

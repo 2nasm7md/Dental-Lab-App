@@ -77,7 +77,11 @@
     "previous": "Previous",
     "open": "Open",
     "viewAll": "View all",
-    "assign": "Assign technician"
+    "assign": "Assign technician",
+    "markAllRead": "Mark all read",
+    "markPaid": "Mark paid",
+    "markPartiallyPaid": "Mark partially paid",
+    "markUnpaid": "Mark unpaid"
   },
   "restoration": {
     "crown": "Crown",
