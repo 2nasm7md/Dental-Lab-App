@@ -1,0 +1,193 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { z } from 'zod';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getCurrentSession } from '@/lib/current-user';
+
+const CaseInputSchema = z.object({
+  owner_doctor_id: z.string().uuid(),
+  lab_org_id: z.string().uuid().nullable().optional(),
+  patient_name: z.string().optional(),
+  patient_ref: z.string().optional(),
+  tooth_numbers: z.array(z.string()).default([]),
+  restoration_type: z
+    .enum([
+      'crown',
+      'bridge',
+      'veneer',
+      'inlay_onlay',
+      'denture_full',
+      'denture_partial',
+      'implant_crown',
+      'implant_bridge',
+      'night_guard',
+      'other',
+    ])
+    .optional(),
+  material: z
+    .enum(['zirconia', 'emax', 'pfm', 'full_metal', 'pmma', 'acrylic', 'other'])
+    .optional(),
+  shade: z.string().optional(),
+  due_date: z.string().optional().nullable(),
+  doctor_notes: z.string().optional(),
+  price: z.union([z.number(), z.string().regex(/^\d*\.?\d*$/)]).optional().nullable(),
+  send: z.boolean().default(false),
+});
+
+export type CaseInput = z.infer<typeof CaseInputSchema>;
+
+export async function createCaseAction(input: CaseInput) {
+  const session = await getCurrentSession();
+  if (!session?.profile?.organization_id) {
+    return { ok: false as const, error: 'Not authenticated' };
+  }
+  const parsed = CaseInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false as const, error: 'Invalid input' };
+  }
+  const v = parsed.data;
+  const supabase = createSupabaseServerClient();
+
+  const { data: created, error } = await supabase
+    .from('cases')
+    .insert({
+      clinic_org_id: session.profile.organization_id,
+      lab_org_id: v.lab_org_id || null,
+      owner_doctor_id: v.owner_doctor_id,
+      created_by: session.profile.id,
+      status: 'draft',
+      patient_name: v.patient_name || null,
+      patient_ref: v.patient_ref || null,
+      tooth_numbers: v.tooth_numbers,
+      restoration_type: v.restoration_type ?? null,
+      material: v.material ?? null,
+      shade: v.shade || null,
+      due_date: v.due_date || null,
+      doctor_notes: v.doctor_notes || null,
+      price: v.price != null && v.price !== '' ? Number(v.price) : null,
+      currency: session.organization?.currency ?? 'USD',
+      payment_status: v.price ? 'unpaid' : null,
+    })
+    .select('id')
+    .single();
+  if (error || !created) {
+    return { ok: false as const, error: error?.message ?? 'Insert failed' };
+  }
+
+  if (v.send && v.lab_org_id) {
+    const { error: sendErr } = await supabase.rpc('send_case', {
+      p_case_id: created.id,
+    });
+    if (sendErr) {
+      return { ok: false as const, error: sendErr.message, caseId: created.id };
+    }
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath('/cases');
+  return { ok: true as const, caseId: created.id };
+}
+
+export async function transitionCaseAction(args: {
+  caseId: string;
+  action:
+    | 'send'
+    | 'accept'
+    | 'decline'
+    | 'reassign'
+    | 'cancel'
+    | 'advance'
+    | 'assign_technician';
+  to?: string;
+  technicianId?: string;
+  reason?: string;
+  newLabId?: string;
+  note?: string;
+}) {
+  const supabase = createSupabaseServerClient();
+  let result;
+  switch (args.action) {
+    case 'send':
+      result = await supabase.rpc('send_case', { p_case_id: args.caseId });
+      break;
+    case 'accept':
+      result = await supabase.rpc('accept_case', {
+        p_case_id: args.caseId,
+        p_assigned_technician: args.technicianId ?? null,
+      });
+      break;
+    case 'decline':
+      result = await supabase.rpc('decline_case', {
+        p_case_id: args.caseId,
+        p_reason: args.reason ?? '',
+      });
+      break;
+    case 'reassign':
+      result = await supabase.rpc('reassign_case', {
+        p_case_id: args.caseId,
+        p_new_lab_id: args.newLabId,
+      });
+      break;
+    case 'cancel':
+      result = await supabase.rpc('cancel_case', {
+        p_case_id: args.caseId,
+        p_reason: args.reason ?? null,
+      });
+      break;
+    case 'assign_technician':
+      result = await supabase.rpc('assign_technician', {
+        p_case_id: args.caseId,
+        p_technician: args.technicianId,
+      });
+      break;
+    case 'advance':
+      result = await supabase.rpc('advance_case', {
+        p_case_id: args.caseId,
+        p_to: args.to,
+        p_note: args.note ?? null,
+      });
+      break;
+  }
+  if (result?.error) {
+    return { ok: false as const, error: result.error.message };
+  }
+  revalidatePath('/dashboard');
+  revalidatePath('/cases');
+  revalidatePath(`/cases/${args.caseId}`);
+  return { ok: true as const };
+}
+
+export async function updateCasePaymentAction(args: {
+  caseId: string;
+  price?: number | null;
+  payment_status?: 'unpaid' | 'partially_paid' | 'paid';
+}) {
+  const supabase = createSupabaseServerClient();
+  const patch: Record<string, unknown> = {};
+  if (args.price !== undefined) patch.price = args.price;
+  if (args.payment_status) patch.payment_status = args.payment_status;
+  const { error } = await supabase
+    .from('cases')
+    .update(patch)
+    .eq('id', args.caseId);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath(`/cases/${args.caseId}`);
+  return { ok: true as const };
+}
+
+export async function postCaseMessageAction(args: { caseId: string; body: string }) {
+  const session = await getCurrentSession();
+  if (!session?.profile) return { ok: false as const, error: 'Not authenticated' };
+  if (!args.body.trim()) return { ok: false as const, error: 'Empty message' };
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase.from('case_messages').insert({
+    case_id: args.caseId,
+    sender_id: session.profile.id,
+    body: args.body.trim(),
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath(`/cases/${args.caseId}`);
+  return { ok: true as const };
+}

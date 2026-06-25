@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-app: 'Cairo', 'Tajawal', 'Segoe UI', 'Inter', system-ui, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+  background-color: #f6f7fb;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-app);
+  }
+  [dir='rtl'] {
+    text-align: right;
+  }
+  [dir='rtl'] .lucide {
+    direction: ltr;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl bg-white shadow-card border border-surface-border;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  }
+  .btn-secondary {
+    @apply btn bg-white border border-surface-border text-ink hover:bg-surface-muted;
+  }
+  .btn-danger {
+    @apply btn bg-status-declined text-white hover:opacity-90;
+  }
+  .btn-ghost {
+    @apply btn text-ink-muted hover:bg-surface-muted;
+  }
+  .input {
+    @apply block w-full rounded-xl border border-surface-border bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200;
+  }
+  .label {
+    @apply block text-sm font-medium text-ink mb-1;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .chip {
+    @apply inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-medium border border-surface-border bg-white text-ink-muted hover:bg-surface-muted cursor-pointer transition-colors;
+  }
+  .chip-active {
+    @apply border-brand-500 bg-brand-50 text-brand-700;
+  }
+}
