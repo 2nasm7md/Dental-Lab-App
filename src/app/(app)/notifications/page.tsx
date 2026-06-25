@@ -1,12 +1,12 @@
 import { getTranslations } from 'next-intl/server';
 import { Bell } from 'lucide-react';
-import { getCurrentSession } from '@/lib/current-user';
+import { requireSession } from '@/lib/current-user';
 import { listMyNotifications } from '@/lib/queries/notifications';
 import { EmptyState } from '@/components/ui/empty-state';
 import { NotificationsList } from '@/components/notifications/notifications-list';
 
 export default async function NotificationsPage() {
-  const session = (await getCurrentSession())!;
+  const session = await requireSession();
   const t = await getTranslations();
   const items = await listMyNotifications(100);
 
@@ -19,7 +19,7 @@ export default async function NotificationsPage() {
           title={t('common.noResults')}
         />
       ) : (
-        <NotificationsList initial={items} recipientUserId={session.profile!.id} />
+        <NotificationsList initial={items} recipientUserId={session.profile.id} />
       )}
     </div>
   );

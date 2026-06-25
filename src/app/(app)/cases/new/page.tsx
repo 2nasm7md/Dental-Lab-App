@@ -1,19 +1,19 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { getCurrentSession } from '@/lib/current-user';
+import { requireSession } from '@/lib/current-user';
 import { sideOfOrgType } from '@/lib/case-state-machine';
 import { listActivePartners, listClinicDoctors } from '@/lib/queries/connections';
 import { CaseForm } from '@/components/cases/case-form';
 
 export default async function NewCasePage() {
-  const session = (await getCurrentSession())!;
+  const session = await requireSession();
   const t = await getTranslations();
-  const side = sideOfOrgType(session.organization!.type);
+  const side = sideOfOrgType(session.organization.type);
   if (side !== 'clinic') redirect('/dashboard');
 
   const [labs, doctors] = await Promise.all([
-    listActivePartners(session.organization!.id, 'clinic'),
-    listClinicDoctors(session.organization!.id),
+    listActivePartners(session.organization.id, 'clinic'),
+    listClinicDoctors(session.organization.id),
   ]);
 
   return (
@@ -22,8 +22,8 @@ export default async function NewCasePage() {
       <CaseForm
         labs={labs.map((p) => ({ id: p.org.id, name: p.org.name }))}
         doctors={doctors.map((d) => ({ id: d.id, name: d.full_name }))}
-        currentUserId={session.profile!.id}
-        currentRole={session.profile!.role!}
+        currentUserId={session.profile.id}
+        currentRole={session.profile.role}
       />
     </div>
   );

@@ -13,6 +13,7 @@ import {
   LogOut,
   Globe,
   Wallet,
+  Users,
 } from 'lucide-react';
 import type { CurrentSession } from '@/lib/current-user';
 import { cn, initials } from '@/lib/utils';
@@ -26,7 +27,11 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-function buildNav(side: 'clinic' | 'lab', costTracking: boolean): NavItem[] {
+function buildNav(
+  side: 'clinic' | 'lab',
+  costTracking: boolean,
+  isAdmin: boolean
+): NavItem[] {
   return [
     { href: '/dashboard', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="size-5" /> },
     { href: '/cases', labelKey: 'nav.cases', icon: <ClipboardList className="size-5" /> },
@@ -38,6 +43,9 @@ function buildNav(side: 'clinic' | 'lab', costTracking: boolean): NavItem[] {
       labelKey: side === 'clinic' ? 'nav.labs' : 'nav.clinics',
       icon: <Building2 className="size-5" />,
     },
+    ...(isAdmin
+      ? [{ href: '/team', labelKey: 'nav.team', icon: <Users className="size-5" /> }]
+      : []),
     ...(costTracking
       ? [{ href: '/billing', labelKey: 'nav.billing', icon: <Wallet className="size-5" /> }]
       : []),
@@ -64,7 +72,9 @@ export function AppShell({
   const costTracking =
     (session.organization?.settings as { cost_tracking_enabled?: boolean })
       ?.cost_tracking_enabled !== false;
-  const items = buildNav(side, costTracking);
+  const isAdmin =
+    session.profile?.role === 'clinic_admin' || session.profile?.role === 'lab_admin';
+  const items = buildNav(side, costTracking, isAdmin);
 
   return (
     <div className="min-h-screen flex bg-surface-muted">

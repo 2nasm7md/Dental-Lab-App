@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { ArrowLeft, Building2, Calendar, FileText, MessageSquare, User } from 'lucide-react';
-import { getCurrentSession } from '@/lib/current-user';
+import { requireSession } from '@/lib/current-user';
 import { getCaseById } from '@/lib/queries/cases';
 import { getCaseHistory, getCaseMessages } from '@/lib/queries/case-detail';
 import {
@@ -18,9 +18,9 @@ import { CasePaymentEditor } from '@/components/cases/case-payment-editor';
 import { formatDate } from '@/lib/utils';
 
 export default async function CaseDetailPage({ params }: { params: { id: string } }) {
-  const session = (await getCurrentSession())!;
+  const session = await requireSession();
   const t = await getTranslations();
-  const side = sideOfOrgType(session.organization!.type);
+  const side = sideOfOrgType(session.organization.type);
 
   const c = await getCaseById(params.id);
   if (!c) notFound();
@@ -29,25 +29,25 @@ export default async function CaseDetailPage({ params }: { params: { id: string 
     getCaseHistory(c.id),
     getCaseMessages(c.id),
     side === 'clinic'
-      ? listActivePartners(session.organization!.id, 'clinic')
+      ? listActivePartners(session.organization.id, 'clinic')
       : Promise.resolve([]),
     side === 'lab'
-      ? listLabTechnicians(session.organization!.id)
+      ? listLabTechnicians(session.organization.id)
       : Promise.resolve([]),
   ]);
 
   const transitions = availableTransitions(c.status, {
     side,
-    role: session.profile!.role!,
-    isAssignedTech: c.assigned_technician_id === session.profile!.id,
+    role: session.profile.role,
+    isAssignedTech: c.assigned_technician_id === session.profile.id,
   });
-  const cancellable = canCancel(c.status, { side, role: session.profile!.role! });
+  const cancellable = canCancel(c.status, { side, role: session.profile.role });
 
   const counterPartyLabel = side === 'clinic' ? t('case.lab') : t('case.clinic');
   const counterPartyName = side === 'clinic' ? c.lab?.name : c.clinic?.name;
 
   const costTrackingEnabled =
-    (session.organization!.settings as { cost_tracking_enabled?: boolean })
+    (session.organization.settings as { cost_tracking_enabled?: boolean })
       ?.cost_tracking_enabled !== false;
 
   return (
@@ -129,7 +129,7 @@ export default async function CaseDetailPage({ params }: { params: { id: string 
             <CaseChat
               caseId={c.id}
               initial={messages}
-              currentUserId={session.profile!.id}
+              currentUserId={session.profile.id}
             />
           </section>
         </div>
@@ -142,13 +142,13 @@ export default async function CaseDetailPage({ params }: { params: { id: string 
                 caseId={c.id}
                 initialPrice={c.price}
                 initialStatus={c.payment_status}
-                currency={c.currency ?? session.organization!.currency}
+                currency={c.currency ?? session.organization.currency}
                 canEdit={
                   side === 'clinic'
                     ? ['clinic_admin', 'doctor', 'secretary'].includes(
-                        session.profile!.role!
+                        session.profile.role
                       )
-                    : session.profile!.role === 'lab_admin'
+                    : session.profile.role === 'lab_admin'
                 }
               />
             </section>

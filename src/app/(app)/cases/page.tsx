@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Filter, Plus } from 'lucide-react';
-import { getCurrentSession } from '@/lib/current-user';
+import { requireSession } from '@/lib/current-user';
 import { listCases, type CaseFilters } from '@/lib/queries/cases';
 import { sideOfOrgType } from '@/lib/case-state-machine';
 import { CaseListCard } from '@/components/cases/case-list-card';
@@ -14,9 +14,9 @@ export default async function CasesPage({
 }: {
   searchParams: { status?: string; q?: string };
 }) {
-  const session = (await getCurrentSession())!;
+  const session = await requireSession();
   const t = await getTranslations();
-  const side = sideOfOrgType(session.organization!.type);
+  const side = sideOfOrgType(session.organization.type);
 
   const filters: CaseFilters = {
     status: (searchParams.status as CaseStatus) ?? 'all',

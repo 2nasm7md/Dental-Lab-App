@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { Inbox, Hourglass, Hammer, PackageCheck, AlertTriangle } from 'lucide-react';
-import { getCurrentSession } from '@/lib/current-user';
+import { requireSession } from '@/lib/current-user';
 import { getDashboardCounts, listCases } from '@/lib/queries/cases';
 import { sideOfOrgType } from '@/lib/case-state-machine';
 import { CaseListCard } from '@/components/cases/case-list-card';
@@ -8,9 +8,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import Link from 'next/link';
 
 export default async function DashboardPage() {
-  const session = (await getCurrentSession())!;
+  const session = await requireSession();
   const t = await getTranslations();
-  const side = sideOfOrgType(session.organization!.type);
+  const side = sideOfOrgType(session.organization.type);
 
   const [counts, recent, attention] = await Promise.all([
     getDashboardCounts(),

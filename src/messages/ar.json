@@ -179,7 +179,9 @@
     "inviteEmail": "البريد الإلكتروني للدعوة",
     "invitePhone": "رقم الهاتف للدعوة",
     "sendInvite": "إرسال الدعوة",
-    "linkCopied": "تم نسخ رابط الدعوة"
+    "linkCopied": "تم نسخ رابط الدعوة",
+    "connected": "متصل",
+    "directoryEmpty": "لا توجد مؤسسات في الدليل بعد"
   },
   "settings": {
     "orgProfile": "الملف التعريفي للمؤسسة",
@@ -193,6 +195,23 @@
     "language": "اللغة",
     "arabic": "العربية",
     "english": "English"
+  },
+  "team": {
+    "title": "فريق العمل",
+    "intro": "{count, plural, =0 {لا يوجد أعضاء بعد} one {عضو واحد} two {عضوان} other {# أعضاء}}",
+    "addMember": "إضافة عضو",
+    "role": "الدور",
+    "you": "أنت",
+    "unnamed": "بدون اسم",
+    "deactivate": "إيقاف",
+    "reactivate": "إعادة التفعيل",
+    "passwordPlaceholder": "اتركه فارغًا لإنشاء كلمة مرور عشوائية",
+    "passwordHint": "إن تركته فارغًا سنُولّد كلمة مرور قوية ونعرضها لك مرة واحدة فقط.",
+    "assistsDoctors": "يساعد الأطباء التالية",
+    "assistsHint": "اتركه فارغًا ليساعد كل الأطباء في العيادة.",
+    "credentialsTitle": "تم إنشاء الحساب",
+    "credentialsHint": "أرسل هذه البيانات إلى العضو ليسجل الدخول.",
+    "credentialsGeneratedHint": "هذه كلمة مرور مؤقتة عشوائية — انسخها الآن، فلن تظهر مرة أخرى."
   },
   "notif": {
     "case_assigned": "تم تعيين حالة جديدة",

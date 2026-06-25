@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { Building2, Search, UserPlus } from 'lucide-react';
-import { getCurrentSession } from '@/lib/current-user';
+import { requireSession } from '@/lib/current-user';
 import { sideOfOrgType } from '@/lib/case-state-machine';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import {
@@ -12,19 +12,24 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ConnectionsActions } from '@/components/connections/connections-actions';
 import { ConnectionsDirectory } from '@/components/connections/connections-directory';
 
-export default async function ConnectionsPage() {
-  const session = (await getCurrentSession())!;
+export default async function ConnectionsPage({
+  searchParams,
+}: {
+  searchParams: { q?: string };
+}) {
+  const session = await requireSession();
   const t = await getTranslations();
-  const side = sideOfOrgType(session.organization!.type);
+  const side = sideOfOrgType(session.organization.type);
+  const q = (searchParams.q ?? '').trim();
 
   const [partners, pending, outgoing, directory] = await Promise.all([
-    listActivePartners(session.organization!.id, side),
+    listActivePartners(session.organization.id, side),
     // Only labs need to "respond" to pending; clinics initiate.
     side === 'lab'
-      ? listPendingConnections(session.organization!.id, side)
+      ? listPendingConnections(session.organization.id, side)
       : Promise.resolve([] as Awaited<ReturnType<typeof listPendingConnections>>),
-    listOutgoingPending(session.organization!.id, side),
-    fetchDirectory(side === 'clinic' ? 'lab' : 'clinic'),
+    listOutgoingPending(session.organization.id, side),
+    fetchDirectory(side === 'clinic' ? 'lab' : 'clinic', q, session.organization.id),
   ]);
 
   const linkedIds = new Set(partners.map((p) => p.org.id));
@@ -100,6 +105,8 @@ export default async function ConnectionsPage() {
           orgs={directory}
           linkedIds={Array.from(linkedIds)}
           pendingIds={Array.from(pendingIds)}
+          initialQuery={q}
+          ownOrgId={session.organization.id}
         />
       </section>
 
@@ -116,15 +123,27 @@ export default async function ConnectionsPage() {
   );
 }
 
-async function fetchDirectory(type: 'clinic' | 'lab') {
+async function fetchDirectory(
+  type: 'clinic' | 'lab',
+  q: string,
+  ownOrgId: string
+) {
   const supabase = createSupabaseServerClient();
-  const { data } = await supabase
+  let query = supabase
     .from('organizations')
     .select('id, name, type, phone, email, logo_url')
     .eq('type', type)
     .is('deleted_at', null)
+    .neq('id', ownOrgId)
     .order('name')
     .limit(50);
+  if (q) {
+    // Search by name (case-insensitive, partial) or phone fragment.
+    // The .or filter uses PostgREST operator syntax.
+    const safe = q.replace(/[%(),]/g, '');
+    query = query.or(`name.ilike.%${safe}%,phone.ilike.%${safe}%`);
+  }
+  const { data } = await query;
   return (data ?? []) as Array<{
     id: string;
     name: string;

@@ -179,7 +179,9 @@
     "inviteEmail": "Email to invite",
     "invitePhone": "Phone to invite",
     "sendInvite": "Send invite",
-    "linkCopied": "Invitation link copied"
+    "linkCopied": "Invitation link copied",
+    "connected": "Connected",
+    "directoryEmpty": "No organizations in the directory yet"
   },
   "settings": {
     "orgProfile": "Organization profile",
@@ -193,6 +195,23 @@
     "language": "Language",
     "arabic": "العربية",
     "english": "English"
+  },
+  "team": {
+    "title": "Team",
+    "intro": "{count, plural, =0 {No members yet} one {1 member} other {# members}}",
+    "addMember": "Add member",
+    "role": "Role",
+    "you": "you",
+    "unnamed": "Unnamed",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "passwordPlaceholder": "Leave blank to generate a random password",
+    "passwordHint": "Leave blank and we'll generate a strong password and show it to you once.",
+    "assistsDoctors": "Assists these doctors",
+    "assistsHint": "Leave empty to assist every doctor in the clinic.",
+    "credentialsTitle": "Account created",
+    "credentialsHint": "Send these credentials to the new member so they can sign in.",
+    "credentialsGeneratedHint": "This is a one-time generated password — copy it now, it won't be shown again."
   },
   "notif": {
     "case_assigned": "New case assigned",

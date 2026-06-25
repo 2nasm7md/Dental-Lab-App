@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Building2, Wallet } from 'lucide-react';
-import { getCurrentSession } from '@/lib/current-user';
+import { requireSession } from '@/lib/current-user';
 import { sideOfOrgType } from '@/lib/case-state-machine';
 import {
   getClinicPartnerTotals,
@@ -12,17 +12,17 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { formatCurrency } from '@/lib/utils';
 
 export default async function BillingPage() {
-  const session = (await getCurrentSession())!;
+  const session = await requireSession();
   const t = await getTranslations();
-  const side = sideOfOrgType(session.organization!.type);
+  const side = sideOfOrgType(session.organization.type);
   const enabled =
-    (session.organization!.settings as { cost_tracking_enabled?: boolean })
+    (session.organization.settings as { cost_tracking_enabled?: boolean })
       .cost_tracking_enabled !== false;
   if (!enabled) redirect('/dashboard');
 
   const totals =
     side === 'clinic' ? await getClinicPartnerTotals() : await getLabPartnerTotals();
-  const currency = session.organization!.currency;
+  const currency = session.organization.currency;
 
   const overall = totals.reduce(
     (acc, row) => {
