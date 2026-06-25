@@ -50,6 +50,29 @@ as $$
   select coalesce((settings ->> p_key)::boolean, false) from organizations where id = p_org_id
 $$;
 
+-- Whether the current auth user assists the given doctor.
+-- A secretary with an empty assists_doctor_ids assists every doctor in the clinic.
+-- Wrapped in plpgsql to dodge the "uuid = uuid[]" parser ambiguity that bites
+-- the inline `d.id = any ((select assists_doctor_ids from users ...))` form
+-- when used directly inside a policy expression.
+create or replace function auth_user_assists_doctor(p_doctor_id uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_ids uuid[];
+begin
+  select assists_doctor_ids into v_ids from users where id = auth.uid();
+  if v_ids is null or cardinality(v_ids) = 0 then
+    return true;
+  end if;
+  return p_doctor_id = any (v_ids);
+end;
+$$;
+
 -- True when the auth user can see a given case (used by cases + child tables)
 create or replace function can_view_case(p_case_id uuid)
 returns boolean
@@ -94,14 +117,7 @@ begin
         return true;
       end if;
       -- And to cases owned by doctors they assist (empty array = assists all)
-      return exists (
-        select 1 from users u
-        where u.id = v_user_id
-          and (
-            cardinality(u.assists_doctor_ids) = 0
-            or c.owner_doctor_id = any (u.assists_doctor_ids)
-          )
-      );
+      return auth_user_assists_doctor(c.owner_doctor_id);
     end if;
   end if;
 
@@ -301,10 +317,7 @@ create policy "cases: clinic insert"
           where d.id = owner_doctor_id
             and d.organization_id = auth_user_org_id()
             and d.role = 'doctor'
-            and (
-              cardinality((select assists_doctor_ids from users where id = auth.uid())) = 0
-              or d.id = any ((select assists_doctor_ids from users where id = auth.uid()))
-            )
+            and auth_user_assists_doctor(d.id)
         )
       )
       or (
