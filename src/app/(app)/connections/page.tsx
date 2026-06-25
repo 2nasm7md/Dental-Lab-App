@@ -30,26 +30,48 @@ async function step<T>(label: string, run: () => Promise<T>): Promise<T> {
       hint: err?.hint,
       stack: err?.stack,
     });
-    // Re-throw with a labelled message so the error boundary names the step.
     const wrapped = new Error(`[connections:${label}] ${err?.message ?? String(e)}`);
     (wrapped as Error & { cause?: unknown }).cause = e;
     throw wrapped;
   }
 }
 
+// Auth/redirect happens OUTSIDE the try block so NEXT_REDIRECT propagates.
+// Everything else runs inside, so a thrown error is caught and rendered
+// inline (gated by NEXT_PUBLIC_DEBUG=true to avoid leaking details in prod).
 export default async function ConnectionsPage({
   searchParams,
 }: {
   searchParams: { q?: string };
 }) {
   const session = await requireSession();
+  const debug = process.env.NEXT_PUBLIC_DEBUG === 'true';
+
+  try {
+    return await renderConnections(session, searchParams);
+  } catch (e) {
+    const err = e as Error & { digest?: string; cause?: unknown };
+    // If the error is a NEXT_REDIRECT, re-throw so the framework can handle it.
+    if (
+      (err as { digest?: string }).digest?.toString().startsWith('NEXT_REDIRECT') ||
+      err?.message === 'NEXT_REDIRECT'
+    ) {
+      throw err;
+    }
+    console.error('[connections] page render failed', err);
+    if (!debug) throw err;
+    return <DebugPanel error={err} />;
+  }
+}
+
+async function renderConnections(
+  session: Awaited<ReturnType<typeof requireSession>>,
+  searchParams: { q?: string }
+) {
   const t = await getTranslations();
   const side = sideOfOrgType(session.organization.type);
   const q = (searchParams.q ?? '').trim();
 
-  // Each step is awaited individually with a labelled try/catch so a failure
-  // shows up in the error boundary as `[connections:<step>] <message>` instead
-  // of a bare TypeError with no clue which call blew up.
   const partners = await step('listActivePartners', () =>
     listActivePartners(session.organization.id, side)
   );
@@ -156,6 +178,58 @@ export default async function ConnectionsPage({
   );
 }
 
+function DebugPanel({ error }: { error: Error & { digest?: string; cause?: unknown } }) {
+  const cause = (error as { cause?: { message?: string; stack?: string; code?: string; details?: string; hint?: string } }).cause;
+  return (
+    <div className="max-w-3xl mx-auto">
+      <div className="card p-6 border-red-200 bg-red-50/40 space-y-4">
+        <div>
+          <div className="text-sm font-bold text-red-700">
+            DEBUG — /connections caught error
+          </div>
+          <div className="text-xs text-red-700/80">
+            digest: <code className="font-mono">{error.digest ?? '—'}</code>
+          </div>
+          <div className="text-xs text-red-700/80 mt-1">
+            Gated by NEXT_PUBLIC_DEBUG=true. Remove the env var to hide this.
+          </div>
+        </div>
+
+        <Field label="message" value={error.message} />
+        <Field label="name" value={error.name} />
+        {cause ? (
+          <>
+            <Field label="cause.message" value={cause.message ?? ''} />
+            <Field label="cause.code" value={cause.code ?? ''} />
+            <Field label="cause.details" value={cause.details ?? ''} />
+            <Field label="cause.hint" value={cause.hint ?? ''} />
+            <Field label="cause.stack" value={cause.stack ?? ''} pre />
+          </>
+        ) : null}
+        <Field label="stack" value={error.stack ?? ''} pre />
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value, pre }: { label: string; value: string; pre?: boolean }) {
+  if (!value) return null;
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-red-700">
+        {label}
+      </div>
+      <pre
+        className={`mt-1 bg-white border border-red-200 rounded-xl p-3 text-xs ${
+          pre ? 'whitespace-pre-wrap break-words max-h-[40vh] overflow-auto' : 'whitespace-pre-wrap break-words'
+        }`}
+      >
+        {value}
+      </pre>
+    </div>
+  );
+}
+
 async function fetchDirectory(
   type: 'clinic' | 'lab',
   q: string,
@@ -171,9 +245,7 @@ async function fetchDirectory(
     .order('name')
     .limit(50);
   if (q) {
-    // Search by name (case-insensitive, partial) or phone fragment.
-    // The .or filter uses PostgREST operator syntax.
-    const safe = q.replace(/[%(),]/g, '');
+    const safe = q.replace(/[%(),:]/g, '');
     query = query.or(`name.ilike.%${safe}%,phone.ilike.%${safe}%`);
   }
   const { data, error } = await query;
