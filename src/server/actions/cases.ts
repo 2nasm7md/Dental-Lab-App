@@ -79,16 +79,29 @@ export async function createCaseAction(input: CaseInput) {
     // Supabase logs to know why the row was rejected. Migration 007 adds
     // the debug_case_rls RPC; if it isn't applied yet, we fall back to a
     // plain error message.
-    let diag: unknown = null;
-    try {
-      const { data: dx, error: dxErr } = await supabase.rpc('debug_case_rls', {
+    // Pull every diagnostic we can. Each call is wrapped so one missing RPC
+    // (e.g. user hasn't applied 008 yet) doesn't hide the rest.
+    const dumpCall = async <T,>(name: string, args: Record<string, unknown>) => {
+      try {
+        const { data, error: rpcErr } = await supabase.rpc(name, args);
+        return rpcErr ? { rpc_error: rpcErr.message } : (data as T);
+      } catch (e) {
+        return { thrown: (e as Error)?.message ?? String(e) };
+      }
+    };
+    const [rls, tryInsert, policies, triggers] = await Promise.all([
+      dumpCall('debug_case_rls', {
         p_clinic_org_id: insertPayload.clinic_org_id,
         p_owner_doctor_id: insertPayload.owner_doctor_id,
-      });
-      diag = dxErr ? { rpc_error: dxErr.message } : dx;
-    } catch (e) {
-      diag = { thrown: (e as Error)?.message ?? String(e) };
-    }
+      }),
+      dumpCall('debug_try_case_insert', {
+        p_clinic_org_id: insertPayload.clinic_org_id,
+        p_owner_doctor_id: insertPayload.owner_doctor_id,
+        p_lab_org_id: insertPayload.lab_org_id,
+      }),
+      dumpCall('debug_cases_policies', {}),
+      dumpCall('debug_cases_triggers', {}),
+    ]);
     const detail = JSON.stringify(
       {
         message: error?.message,
@@ -105,7 +118,10 @@ export async function createCaseAction(input: CaseInput) {
           profileRole: session.profile?.role,
           profileOrgId: session.profile?.organization_id,
         },
-        debug_case_rls: diag,
+        debug_case_rls: rls,
+        debug_try_case_insert: tryInsert,
+        debug_cases_policies: policies,
+        debug_cases_triggers: triggers,
       },
       null,
       2
