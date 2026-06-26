@@ -55,25 +55,27 @@ export async function createCaseAction(input: CaseInput) {
     lab_org_id: v.lab_org_id || null,
     owner_doctor_id: v.owner_doctor_id,
     created_by: session.profile.id,
-    status: 'draft' as const,
-    patient_name: v.patient_name || null,
-    patient_ref: v.patient_ref || null,
-    tooth_numbers: v.tooth_numbers,
-    restoration_type: v.restoration_type ?? null,
-    material: v.material ?? null,
-    shade: v.shade || null,
-    due_date: v.due_date || null,
-    doctor_notes: v.doctor_notes || null,
-    price: v.price != null && v.price !== '' ? Number(v.price) : null,
-    currency: session.organization?.currency ?? 'USD',
-    payment_status: v.price ? ('unpaid' as const) : null,
   };
 
-  const { data: created, error } = await supabase
-    .from('cases')
-    .insert(insertPayload)
-    .select('id')
-    .single();
+  // Migration 011 funnels case creation through a SECURITY DEFINER RPC so
+  // that RLS edge-cases on direct INSERTs can't bite. The RPC does all the
+  // authorization the old policy did and returns the new case id.
+  const { data: createdId, error } = await supabase.rpc('create_case', {
+    p_owner_doctor_id: v.owner_doctor_id,
+    p_lab_org_id: v.lab_org_id || null,
+    p_patient_name: v.patient_name || '',
+    p_patient_ref: v.patient_ref || '',
+    p_tooth_numbers: v.tooth_numbers,
+    p_restoration_type: v.restoration_type ?? null,
+    p_material: v.material ?? null,
+    p_shade: v.shade || '',
+    p_due_date: v.due_date || null,
+    p_doctor_notes: v.doctor_notes || '',
+    p_price: v.price != null && v.price !== '' ? Number(v.price) : null,
+    p_currency: session.organization?.currency ?? '',
+    p_send: Boolean(v.send && v.lab_org_id),
+  });
+  const created = createdId ? { id: createdId as string } : null;
   if (error || !created) {
     // Surface the live RLS diagnostic back to the form so we don't need
     // Supabase logs to know why the row was rejected. Migration 007 adds
@@ -130,14 +132,7 @@ export async function createCaseAction(input: CaseInput) {
     return { ok: false as const, error: detail };
   }
 
-  if (v.send && v.lab_org_id) {
-    const { error: sendErr } = await supabase.rpc('send_case', {
-      p_case_id: created.id,
-    });
-    if (sendErr) {
-      return { ok: false as const, error: sendErr.message, caseId: created.id };
-    }
-  }
+  // The RPC handles sending internally when p_send=true.
 
   revalidatePath('/dashboard');
   revalidatePath('/cases');
