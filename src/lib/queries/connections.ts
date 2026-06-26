@@ -154,6 +154,22 @@ export async function listClinicDoctors(clinicOrgId: string): Promise<AppUser[]>
   return (data ?? []) as AppUser[];
 }
 
+// Returns everyone in the clinic who is allowed to OWN a case:
+// active doctors and active clinic_admins. Used by the new-case form so a
+// solo-clinic admin can pick themselves.
+export async function listClinicCaseOwners(clinicOrgId: string): Promise<AppUser[]> {
+  const supabase = createSupabaseServerClient();
+  const { data } = await supabase
+    .from('users')
+    .select('*')
+    .eq('organization_id', clinicOrgId)
+    .in('role', ['doctor', 'clinic_admin'])
+    .eq('is_active', true)
+    .order('role')
+    .order('full_name');
+  return (data ?? []) as AppUser[];
+}
+
 export async function listLabTechnicians(labOrgId: string): Promise<AppUser[]> {
   const supabase = createSupabaseServerClient();
   const { data } = await supabase

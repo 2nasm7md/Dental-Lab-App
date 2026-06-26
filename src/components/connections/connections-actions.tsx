@@ -10,7 +10,7 @@ import {
   requestConnectionAction,
 } from '@/server/actions/connections';
 
-function PendingRow({
+export function PendingRow({
   row,
 }: {
   row: {
@@ -56,7 +56,7 @@ function PendingRow({
   );
 }
 
-function Invite({ invitedType }: { invitedType: 'clinic' | 'lab' }) {
+export function Invite({ invitedType }: { invitedType: 'clinic' | 'lab' }) {
   const t = useTranslations();
   const [pending, start] = useTransition();
   const [email, setEmail] = useState('');
@@ -119,7 +119,7 @@ function Invite({ invitedType }: { invitedType: 'clinic' | 'lab' }) {
   );
 }
 
-function ConnectButton({
+export function ConnectButton({
   targetOrgId,
   disabled,
 }: {
@@ -145,4 +145,3 @@ function ConnectButton({
   );
 }
 
-export const ConnectionsActions = { PendingRow, Invite, ConnectButton };

@@ -26,9 +26,15 @@ export function CaseForm({ labs, doctors, currentUserId, currentRole }: Props) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const [ownerDoctorId, setOwnerDoctorId] = useState<string>(
-    currentRole === 'doctor' ? currentUserId : doctors[0]?.id ?? ''
-  );
+  const [ownerDoctorId, setOwnerDoctorId] = useState<string>(() => {
+    if (currentRole === 'doctor') return currentUserId;
+    // For clinic_admin, prefer themselves as the case owner — handles the
+    // solo-clinic case where no doctor user exists yet.
+    if (currentRole === 'clinic_admin' && doctors.some((d) => d.id === currentUserId)) {
+      return currentUserId;
+    }
+    return doctors[0]?.id ?? '';
+  });
   const [labId, setLabId] = useState<string>(labs[0]?.id ?? '');
   const [patientName, setPatientName] = useState('');
   const [patientRef, setPatientRef] = useState('');

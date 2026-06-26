@@ -38,6 +38,8 @@ supabase/migrations/
   004_storage_buckets.sql     case-attachments / avatars / org-logos
   005_notifications.sql       new_message/connection_request/payment_updated
                               triggers + realtime publication + mark-all-read
+  006_clinic_admin_as_owner.sql  Allow clinic_admin to own cases themselves
+                              (solo-clinic case-insert RLS fix)
 ```
 
 ## Setup

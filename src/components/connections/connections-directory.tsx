@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Search, Building2, CheckCircle2, Clock } from 'lucide-react';
-import { ConnectionsActions } from './connections-actions';
+import { ConnectButton } from './connections-actions';
 
 interface OrgRow {
   id: string;
@@ -97,7 +97,7 @@ export function ConnectionsDirectory({
                     {t('connections.requestSent')}
                   </span>
                 ) : (
-                  <ConnectionsActions.ConnectButton targetOrgId={o.id} />
+                  <ConnectButton targetOrgId={o.id} />
                 )}
               </div>
             );
