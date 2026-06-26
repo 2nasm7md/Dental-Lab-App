@@ -50,30 +50,68 @@ export async function createCaseAction(input: CaseInput) {
   const v = parsed.data;
   const supabase = createSupabaseServerClient();
 
+  const insertPayload = {
+    clinic_org_id: session.profile.organization_id,
+    lab_org_id: v.lab_org_id || null,
+    owner_doctor_id: v.owner_doctor_id,
+    created_by: session.profile.id,
+    status: 'draft' as const,
+    patient_name: v.patient_name || null,
+    patient_ref: v.patient_ref || null,
+    tooth_numbers: v.tooth_numbers,
+    restoration_type: v.restoration_type ?? null,
+    material: v.material ?? null,
+    shade: v.shade || null,
+    due_date: v.due_date || null,
+    doctor_notes: v.doctor_notes || null,
+    price: v.price != null && v.price !== '' ? Number(v.price) : null,
+    currency: session.organization?.currency ?? 'USD',
+    payment_status: v.price ? ('unpaid' as const) : null,
+  };
+
   const { data: created, error } = await supabase
     .from('cases')
-    .insert({
-      clinic_org_id: session.profile.organization_id,
-      lab_org_id: v.lab_org_id || null,
-      owner_doctor_id: v.owner_doctor_id,
-      created_by: session.profile.id,
-      status: 'draft',
-      patient_name: v.patient_name || null,
-      patient_ref: v.patient_ref || null,
-      tooth_numbers: v.tooth_numbers,
-      restoration_type: v.restoration_type ?? null,
-      material: v.material ?? null,
-      shade: v.shade || null,
-      due_date: v.due_date || null,
-      doctor_notes: v.doctor_notes || null,
-      price: v.price != null && v.price !== '' ? Number(v.price) : null,
-      currency: session.organization?.currency ?? 'USD',
-      payment_status: v.price ? 'unpaid' : null,
-    })
+    .insert(insertPayload)
     .select('id')
     .single();
   if (error || !created) {
-    return { ok: false as const, error: error?.message ?? 'Insert failed' };
+    // Surface the live RLS diagnostic back to the form so we don't need
+    // Supabase logs to know why the row was rejected. Migration 007 adds
+    // the debug_case_rls RPC; if it isn't applied yet, we fall back to a
+    // plain error message.
+    let diag: unknown = null;
+    try {
+      const { data: dx, error: dxErr } = await supabase.rpc('debug_case_rls', {
+        p_clinic_org_id: insertPayload.clinic_org_id,
+        p_owner_doctor_id: insertPayload.owner_doctor_id,
+      });
+      diag = dxErr ? { rpc_error: dxErr.message } : dx;
+    } catch (e) {
+      diag = { thrown: (e as Error)?.message ?? String(e) };
+    }
+    const detail = JSON.stringify(
+      {
+        message: error?.message,
+        code: (error as { code?: string } | null)?.code,
+        details: (error as { details?: string } | null)?.details,
+        hint: (error as { hint?: string } | null)?.hint,
+        attempted: {
+          clinic_org_id: insertPayload.clinic_org_id,
+          owner_doctor_id: insertPayload.owner_doctor_id,
+          created_by: insertPayload.created_by,
+        },
+        session: {
+          authUserId: session.authUserId,
+          profileRole: session.profile?.role,
+          profileOrgId: session.profile?.organization_id,
+        },
+        debug_case_rls: diag,
+      },
+      null,
+      2
+    );
+    console.error('[createCaseAction] insert failed\n' + detail);
+    return { ok: false as const, error: detail };
   }
 
   if (v.send && v.lab_org_id) {

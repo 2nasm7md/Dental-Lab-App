@@ -74,8 +74,15 @@ export function CaseForm({ labs, doctors, currentUserId, currentRole }: Props) {
   return (
     <div className="space-y-5">
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm px-3 py-2">
-          {error}
+        <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm px-3 py-2 space-y-2">
+          <div className="font-semibold">{t('common.error')}</div>
+          {error.startsWith('{') ? (
+            <pre className="text-xs whitespace-pre-wrap break-words bg-white border border-red-200 rounded-xl p-2 max-h-[50vh] overflow-auto">
+              {error}
+            </pre>
+          ) : (
+            <div>{error}</div>
+          )}
         </div>
       ) : null}
 
