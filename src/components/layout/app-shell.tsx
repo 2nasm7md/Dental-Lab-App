@@ -58,10 +58,12 @@ export function AppShell({
   session,
   children,
   notificationsSlot,
+  messagesSlot,
 }: {
   session: CurrentSession;
   children: React.ReactNode;
   notificationsSlot?: React.ReactNode;
+  messagesSlot?: React.ReactNode;
 }) {
   const t = useTranslations();
   const pathname = usePathname();
@@ -139,7 +141,8 @@ export function AppShell({
           <div className="hidden md:block font-semibold text-ink-muted">
             {session.profile?.full_name}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {messagesSlot}
             {notificationsSlot}
             <div className="size-9 rounded-full bg-brand-100 text-brand-800 grid place-items-center text-sm font-semibold">
               {initials(session.profile?.full_name ?? '')}
