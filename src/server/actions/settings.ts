@@ -1,43 +1,45 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { requireOnboarded } from '@/lib/auth/session';
+import { assertPermission } from '@/lib/auth/permissions';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { getCurrentSession } from '@/lib/current-user';
+import {
+  clinicSettingsSchema,
+  type ClinicSettingsInput,
+} from '@/lib/validation/settings';
 
-export async function updateOrgSettingsAction(patch: {
-  all_doctors_see_all_cases?: boolean;
-  cost_tracking_enabled?: boolean;
-  techs_see_unassigned?: boolean;
-}) {
-  const session = await getCurrentSession();
-  if (!session?.organization) return { ok: false as const, error: 'no_org' };
-  const supabase = createSupabaseServerClient();
-  const newSettings = { ...session.organization.settings, ...patch };
-  const { error } = await supabase
-    .from('organizations')
-    .update({ settings: newSettings })
-    .eq('id', session.organization.id);
-  if (error) return { ok: false as const, error: error.message };
-  revalidatePath('/settings');
-  revalidatePath('/dashboard');
-  return { ok: true as const };
-}
+export async function updateClinicSettings(input: ClinicSettingsInput) {
+  const session = await requireOnboarded();
+  assertPermission(session.role, 'settings.manage');
+  const data = clinicSettingsSchema.parse(input);
+  const supabase = await createSupabaseServerClient();
 
-export async function updateOrgProfileAction(patch: {
-  name?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  currency?: string;
-}) {
-  const session = await getCurrentSession();
-  if (!session?.organization) return { ok: false as const, error: 'no_org' };
-  const supabase = createSupabaseServerClient();
-  const { error } = await supabase
-    .from('organizations')
-    .update(patch)
-    .eq('id', session.organization.id);
-  if (error) return { ok: false as const, error: error.message };
+  const { error: e1 } = await supabase
+    .from('clinic_settings')
+    .update({
+      display_name: data.display_name,
+      tagline: data.tagline || null,
+      logo_url: data.logo_url || null,
+      primary_color: data.primary_color,
+      secondary_color: data.secondary_color,
+      phone: data.phone || null,
+      whatsapp: data.whatsapp || null,
+      email: data.email || null,
+      address: data.address || null,
+      about: data.about || null,
+      default_locale: data.default_locale,
+      rtl_enabled: data.rtl_enabled,
+    })
+    .eq('tenant_id', session.tenantId);
+  if (e1) throw new Error(e1.message);
+
+  const { error: e2 } = await supabase
+    .from('tenants')
+    .update({ public: data.public })
+    .eq('id', session.tenantId);
+  if (e2) throw new Error(e2.message);
+
   revalidatePath('/settings');
-  return { ok: true as const };
+  revalidatePath(`/c/[slug]`, 'layout');
 }

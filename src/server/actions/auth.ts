@@ -1,131 +1,78 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { z } from 'zod';
-import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
-import type { OrganizationType, UserRole } from '@/lib/types/db';
-
-const SignUpSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  fullName: z.string().min(1),
-  phone: z.string().optional(),
-});
-
-const SignInSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { setActiveTenant } from '@/lib/auth/session';
+import {
+  loginSchema,
+  signupSchema,
+  onboardingSchema,
+} from '@/lib/validation/auth';
 
 export interface ActionResult {
-  ok: boolean;
   error?: string;
 }
 
-export async function signInAction(formData: FormData): Promise<ActionResult> {
-  const parsed = SignInSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { ok: false, error: 'Invalid input' };
+export async function loginAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const parsed = loginSchema.safeParse(Object.fromEntries(fd));
+  if (!parsed.success) return { error: 'invalid_credentials' };
 
-  const supabase = createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword({
-    email: parsed.data.email,
-    password: parsed.data.password,
-  });
-  if (error) return { ok: false, error: error.message };
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  if (error) return { error: 'invalid_credentials' };
+
+  const { data: rows } = await supabase
+    .from('tenant_users')
+    .select('tenant_id')
+    .limit(1);
+
+  if (!rows || rows.length === 0) redirect('/onboarding');
   redirect('/dashboard');
 }
 
-export async function signUpAction(formData: FormData): Promise<ActionResult> {
-  const parsed = SignUpSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { ok: false, error: 'Invalid input' };
+export async function signupAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const parsed = signupSchema.safeParse(Object.fromEntries(fd));
+  if (!parsed.success) return { error: 'invalid_input' };
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: {
-      data: { full_name: parsed.data.fullName, phone: parsed.data.phone },
-    },
+    options: { data: { full_name: parsed.data.full_name } },
   });
-  if (error) return { ok: false, error: error.message };
+  if (error || !data.user) return { error: 'signup_failed' };
 
-  // Create a barebones profile row so RLS helpers have something to read.
-  if (data.user) {
-    const admin = createSupabaseServiceClient();
-    await admin.from('users').upsert(
-      {
-        id: data.user.id,
-        full_name: parsed.data.fullName,
-        phone: parsed.data.phone ?? null,
-      },
-      { onConflict: 'id' }
-    );
-  }
   redirect('/onboarding');
 }
 
-const CreateOrgSchema = z.object({
-  type: z.enum(['clinic', 'lab']),
-  name: z.string().min(2),
-  phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal('')),
-  address: z.string().optional(),
-  currency: z.string().default('USD'),
-});
-
-export async function createOrgAction(formData: FormData): Promise<ActionResult> {
-  const supabase = createSupabaseServerClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
-  if (!user) return { ok: false, error: 'Not authenticated' };
-
-  const parsed = CreateOrgSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { ok: false, error: 'Invalid input' };
-
-  const admin = createSupabaseServiceClient();
-  const role: UserRole = parsed.data.type === 'clinic' ? 'clinic_admin' : 'lab_admin';
-
-  const { data: org, error: orgErr } = await admin
-    .from('organizations')
-    .insert({
-      type: parsed.data.type as OrganizationType,
-      name: parsed.data.name,
-      phone: parsed.data.phone || null,
-      email: parsed.data.email || null,
-      address: parsed.data.address || null,
-      currency: parsed.data.currency || 'USD',
-    })
-    .select()
-    .single();
-  if (orgErr || !org) return { ok: false, error: orgErr?.message ?? 'Failed to create org' };
-
-  const { error: profileErr } = await admin
-    .from('users')
-    .update({ organization_id: org.id, role })
-    .eq('id', user.id);
-  if (profileErr) return { ok: false, error: profileErr.message };
-
-  revalidatePath('/', 'layout');
-  redirect('/dashboard');
-}
-
-export async function signOutAction() {
-  const supabase = createSupabaseServerClient();
+export async function logoutAction(): Promise<void> {
+  const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   redirect('/login');
 }
 
-export async function setLocaleAction(locale: 'ar' | 'en') {
-  const { cookies } = await import('next/headers');
-  cookies().set('NEXT_LOCALE', locale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
-  revalidatePath('/', 'layout');
-}
+export async function provisionTenantAction(
+  _: ActionResult,
+  fd: FormData
+): Promise<ActionResult> {
+  const parsed = onboardingSchema.safeParse(Object.fromEntries(fd));
+  if (!parsed.success) return { error: 'invalid_input' };
 
-export async function toggleLocaleAction() {
-  const { cookies } = await import('next/headers');
-  const current = cookies().get('NEXT_LOCALE')?.value ?? 'ar';
-  const next = current === 'ar' ? 'en' : 'ar';
-  cookies().set('NEXT_LOCALE', next, { path: '/', maxAge: 60 * 60 * 24 * 365 });
-  revalidatePath('/', 'layout');
+  const supabase = await createSupabaseServerClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return { error: 'unauthenticated' };
+
+  const fullName =
+    (userData.user.user_metadata?.full_name as string | undefined) ?? userData.user.email!;
+
+  const { data, error } = await supabase.rpc('provision_tenant', {
+    p_name: parsed.data.clinic_name,
+    p_slug: parsed.data.slug,
+    p_full_name: fullName,
+    p_email: userData.user.email!,
+  });
+
+  if (error || !data || data.length === 0) return { error: 'provision_failed' };
+  await setActiveTenant(data[0].tenant_id);
+  redirect('/dashboard');
 }

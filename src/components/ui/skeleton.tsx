@@ -1,13 +1,10 @@
 import { cn } from '@/lib/utils';
 
-export function Skeleton({ className }: { className?: string }) {
+export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('animate-pulse rounded-lg bg-surface-border', className)} />
-  );
-}
-
-export function SkeletonCard({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn('card p-4', className)}>{children}</div>
+    <div
+      className={cn('animate-pulse rounded-md bg-muted', className)}
+      {...props}
+    />
   );
 }

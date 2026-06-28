@@ -1,56 +1,17 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { redirect } from 'next/navigation';
-import { signUpAction } from '@/server/actions/auth';
-import { FormBanner } from '@/components/forms/form-banner';
+import { SignupForm } from './signup-form';
 
 export default async function SignupPage() {
-  const t = await getTranslations();
-
-  async function action(formData: FormData) {
-    'use server';
-    const result = await signUpAction(formData);
-    if (result && !result.ok) {
-      redirect(`/signup?error=${encodeURIComponent(result.error ?? 'error')}`);
-    }
-  }
-
+  const t = await getTranslations('auth');
   return (
-    <div className="card p-8">
-      <h1 className="text-2xl font-bold text-ink mb-1">{t('auth.signUp')}</h1>
-      <p className="text-sm text-ink-muted mb-6">{t('app.tagline')}</p>
-      <FormBanner />
-      <form action={action} className="space-y-4">
-        <div>
-          <label className="label">{t('auth.fullName')}</label>
-          <input name="fullName" required className="input" />
-        </div>
-        <div>
-          <label className="label">{t('auth.email')}</label>
-          <input name="email" type="email" required className="input" />
-        </div>
-        <div>
-          <label className="label">{t('auth.phone')}</label>
-          <input name="phone" type="tel" className="input" />
-        </div>
-        <div>
-          <label className="label">{t('auth.password')}</label>
-          <input
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            className="input"
-          />
-        </div>
-        <button type="submit" className="btn-primary w-full">
-          {t('auth.signUp')}
-        </button>
-      </form>
-      <p className="mt-6 text-sm text-ink-muted text-center">
-        {t('auth.alreadyHaveAccount')}{' '}
-        <Link href="/login" className="text-brand-700 font-medium">
-          {t('auth.signIn')}
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">{t('signup')}</h2>
+      <SignupForm />
+      <p className="text-sm text-muted-foreground">
+        {t('to_login')}{' '}
+        <Link href="/login" className="font-medium text-primary hover:underline">
+          {t('login')}
         </Link>
       </p>
     </div>

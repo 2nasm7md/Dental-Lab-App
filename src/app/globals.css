@@ -3,61 +3,92 @@
 @tailwind utilities;
 
 :root {
-  --font-app: 'Cairo', 'Tajawal', 'Segoe UI', 'Inter', system-ui, sans-serif;
+  --font-app: 'Cairo', 'Tajawal', 'Inter', system-ui, sans-serif;
+
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+
+  --primary: 199 89% 48%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 100%;
+
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 199 89% 48%;
+
+  --radius: 0.75rem;
 }
 
-html,
-body {
-  height: 100%;
-  background-color: #f6f7fb;
-  color: #0f172a;
-  -webkit-font-smoothing: antialiased;
+.dark {
+  --background: 222 47% 8%;
+  --foreground: 210 40% 98%;
+
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+
+  --primary: 199 89% 55%;
+  --primary-foreground: 222 47% 11%;
+
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+
+  --destructive: 0 63% 40%;
+  --destructive-foreground: 210 40% 98%;
+
+  --success: 142 71% 38%;
+  --success-foreground: 210 40% 98%;
+
+  --warning: 38 92% 45%;
+  --warning-foreground: 210 40% 98%;
+
+  --border: 217 33% 20%;
+  --input: 217 33% 20%;
+  --ring: 199 89% 55%;
 }
 
 @layer base {
-  body {
-    font-family: var(--font-app);
+  * {
+    @apply border-border;
   }
-  [dir='rtl'] {
-    text-align: right;
+  html,
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-app);
+    -webkit-font-smoothing: antialiased;
   }
   [dir='rtl'] .lucide {
     direction: ltr;
-  }
-}
-
-@layer components {
-  .card {
-    @apply rounded-2xl bg-white shadow-card border border-surface-border;
-  }
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-  .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700;
-  }
-  .btn-secondary {
-    @apply btn bg-white border border-surface-border text-ink hover:bg-surface-muted;
-  }
-  .btn-danger {
-    @apply btn bg-status-declined text-white hover:opacity-90;
-  }
-  .btn-ghost {
-    @apply btn text-ink-muted hover:bg-surface-muted;
-  }
-  .input {
-    @apply block w-full rounded-xl border border-surface-border bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200;
-  }
-  .label {
-    @apply block text-sm font-medium text-ink mb-1;
-  }
-  .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
-  }
-  .chip {
-    @apply inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-medium border border-surface-border bg-white text-ink-muted hover:bg-surface-muted cursor-pointer transition-colors;
-  }
-  .chip-active {
-    @apply border-brand-500 bg-brand-50 text-brand-700;
   }
 }
