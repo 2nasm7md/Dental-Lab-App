@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -14,12 +15,14 @@ import {
   Globe,
   Wallet,
   Users,
+  Loader2,
 } from 'lucide-react';
 import type { CurrentSession } from '@/lib/current-user';
 import { cn, initials } from '@/lib/utils';
 import { signOutAction, toggleLocaleAction } from '@/server/actions/auth';
 import { sideOfOrgType } from '@/lib/case-state-machine';
 import { useLocale } from 'next-intl';
+import { ProgressBar } from './progress-bar';
 
 interface NavItem {
   href: string;
@@ -68,6 +71,16 @@ export function AppShell({
   const t = useTranslations();
   const pathname = usePathname();
   const locale = useLocale();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  const onNavClick = (href: string) => {
+    if (href !== pathname) setPendingHref(href);
+  };
+
   const side = session.organization
     ? sideOfOrgType(session.organization.type)
     : 'clinic';
@@ -79,6 +92,8 @@ export function AppShell({
   const items = buildNav(side, costTracking, isAdmin);
 
   return (
+    <>
+    <ProgressBar active={!!pendingHref} />
     <div className="min-h-screen flex bg-surface-muted">
       <aside className="hidden md:flex md:flex-col w-64 bg-white border-e border-surface-border">
         <div className="px-6 py-5 border-b border-surface-border flex items-center gap-2">
@@ -95,10 +110,12 @@ export function AppShell({
         <nav className="p-3 flex-1">
           {items.map((it) => {
             const active = pathname === it.href || pathname?.startsWith(it.href + '/');
+            const loading = pendingHref === it.href;
             return (
               <Link
                 key={it.href}
                 href={it.href}
+                onClick={() => onNavClick(it.href)}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium',
                   active
@@ -106,7 +123,11 @@ export function AppShell({
                     : 'text-ink-muted hover:bg-surface-muted hover:text-ink'
                 )}
               >
-                {it.icon}
+                {loading ? (
+                  <Loader2 className="size-5 animate-spin shrink-0" />
+                ) : (
+                  it.icon
+                )}
                 <span>{t(it.labelKey)}</span>
               </Link>
             );
@@ -153,16 +174,18 @@ export function AppShell({
         <nav className="md:hidden bg-white border-t border-surface-border px-2 py-1.5 flex justify-around sticky bottom-0">
           {items.slice(0, 5).map((it) => {
             const active = pathname === it.href || pathname?.startsWith(it.href + '/');
+            const loading = pendingHref === it.href;
             return (
               <Link
                 key={it.href}
                 href={it.href}
+                onClick={() => onNavClick(it.href)}
                 className={cn(
                   'flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-[10px]',
                   active ? 'text-brand-700' : 'text-ink-subtle'
                 )}
               >
-                {it.icon}
+                {loading ? <Loader2 className="size-5 animate-spin" /> : it.icon}
                 <span>{t(it.labelKey)}</span>
               </Link>
             );
@@ -170,5 +193,6 @@ export function AppShell({
         </nav>
       </div>
     </div>
+    </>
   );
 }
